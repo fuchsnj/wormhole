@@ -30,6 +30,7 @@ use server;
 use body::Body;
 use std::marker::PhantomData;
 use std::sync::Arc;
+use method::Method;
 
 pub struct Route<D1, D2, E>{
 	handler: Arc<Handler<D1, D2, E> + Send + Sync + 'static>
@@ -66,16 +67,6 @@ impl<D2: 'static, E: 'static> Route<(), D2, E>{
 	}
 }
 
-/*
-impl<E> Route<(), (), E>{
-	pub fn new() -> Route<(), (), (), E>{
-		Route{
-			handler: (),
-			phantom: PhantomData
-		}		
-	}
-}*/
-
 pub fn route<E>() -> Route<(), (), E>{
 	Route{
 		handler: Arc::new(())
@@ -101,8 +92,6 @@ impl<D1: 'static, D2: 'static, E: 'static> Route<D1, D2, E>{
 			})
 		}
 	}
-	//pub fn method<T>(mut self, method: Method, handler: T) -> SubRoute<D1, D2, E>
-	//where T: Handler<D1, D2, E> + 'static;
 	
 	pub fn param<H2>(self, handler: H2) -> Route<D1, D2, E>
 	where H2: Send + Sync + ParamHandler<D2, E> + 'static{
@@ -147,6 +136,52 @@ impl<D1: 'static, D2: 'static, E: 'static> Route<D1, D2, E>{
 			})
 		}
 	}
+	pub fn method<H2>(self, method: Method, handler: H2) -> Route<D1, D2, E>
+	where H2: Send + Sync + Handler<D2, D2, E> + 'static{
+		self.root(move |req: &mut Request, data|{
+			match req.get_method() == &method{
+				true => handler.handle(req, data),
+				false => req.next(data)
+			}
+		})
+	}
+	pub fn get<H2>(self, handler: H2) -> Route<D1, D2, E>
+	where H2: Handler<D2, D2, E> + 'static{
+		self.method(Method::Get, handler)
+	}
+	pub fn post<H2>(self, handler: H2) -> Route<D1, D2, E>
+	where H2: Handler<D2, D2, E> + 'static{
+		self.method(Method::Post, handler)
+	}
+	pub fn put<H2>(self, handler: H2) -> Route<D1, D2, E>
+	where H2: Handler<D2, D2, E> + 'static{
+		self.method(Method::Put, handler)
+	}
+	pub fn delete<H2>(self, handler: H2) -> Route<D1, D2, E>
+	where H2: Handler<D2, D2, E> + 'static{
+		self.method(Method::Delete, handler)
+	}
+	pub fn head<H2>(self, handler: H2) -> Route<D1, D2, E>
+	where H2: Handler<D2, D2, E> + 'static{
+		self.method(Method::Head, handler)
+	}
+	pub fn trace<H2>(self, handler: H2) -> Route<D1, D2, E>
+	where H2: Handler<D2, D2, E> + 'static{
+		self.method(Method::Trace, handler)
+	}
+	pub fn connect<H2>(self, handler: H2) -> Route<D1, D2, E>
+	where H2: Handler<D2, D2, E> + 'static{
+		self.method(Method::Connect, handler)
+	}
+	pub fn patch<H2>(self, handler: H2) -> Route<D1, D2, E>
+	where H2: Handler<D2, D2, E> + 'static{
+		self.method(Method::Patch, handler)
+	}
+	pub fn options<H2>(self, handler: H2) -> Route<D1, D2, E>
+	where H2: Handler<D2, D2, E> + 'static{
+		self.method(Method::Options, handler)
+	}
+
 }
 
 fn get_next_url_segment(mut path: &str) -> (Option<&str>, &str){
