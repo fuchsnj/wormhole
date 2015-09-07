@@ -1,102 +1,41 @@
-use std::sync::mpsc::channel;
-
-#[test]
-fn it_works() {
-	let server = Route::new()
-	.start("127.0.0.1:8081");
-	
-	panic!("Fail");
-}
-
 extern crate hyper;
+extern crate url;
+extern crate rustc_serialize;
+extern crate unicase;
 
-use std::net::ToSocketAddrs;
-use hyper::net::HttpListener;
-use std::collections::HashMap;
-use hyper::net::Fresh;
-use hyper::status::StatusCode;
-use std::io::{Read, Write};
+pub mod handler;
+mod route;
+mod request;
+mod body;
+mod server;
 
-struct Request;
-struct Response<'a>{
-	hyper: hyper::server::response::Response<'a, Fresh>
+mod status_code{
+	pub use hyper::status::StatusCode;
 }
-impl<'a> Response<'a>{
-	fn send<T>(mut self, data: T) where T: Body{
-		let mut stream = self.hyper.start().unwrap();
-		data.write_to(&mut stream);
-	}
+mod method{
+	pub use hyper::method::Method;
 }
-
-trait Handler: Send + Sync{
-	fn handle(&self, req: Request, res: Response);
+pub mod header{
+	pub use hyper::header::*;
 }
 
-struct Server{
-	listening: hyper::server::Listening
+pub use route::Route;
+//pub use route::SubRoute;
+//pub use route::AfterRoute;
+
+pub use request::Request;
+pub use status_code::StatusCode;
+pub use method::Method;
+pub use header::Header;
+
+pub mod prelude{
+	pub use route::route;
+	pub use {Request, StatusCode};
+	pub use Route;
+	pub use server::Server;
+	//pub use {Route, SubRoute, AfterRoute};
+	pub use header;
+	pub use handler::{Action, HandlerResult};
+	//pub use route::{BeforeMiddlewareMethods, RootMiddlewareMethods, SubMiddlewareMethods, AfterMiddlewareMethods, StartServer};
 }
 
-struct RootHandler{
-	handlers: HashMap<String, Box<Handler>>
-}
-impl RootHandler{
-	fn new() -> RootHandler{
-		RootHandler{
-			handlers: HashMap::new()
-		}
-	}
-}
-
-struct Route{
-	sub_handlers: HashMap<String, Route>,
-	root_handler: RootHandler
-}
-unsafe impl Send for Route{}
-unsafe impl Sync for Route{}
-impl Handler for Route{
-	fn handle(&self, req: Request, mut res: Response){
-		res.send("Hello from wormhole!")
-	}
-}
-
-trait Body{
-	fn write_to(&self, dest: &mut Write);
-}
-impl<'a> Body for &'a str{
-	fn write_to(&self, dest: &mut Write){
-		dest.write(self.as_bytes()).unwrap();
-	}
-}
-
-impl Route{
-	fn new() -> Route{
-		Route{
-			sub_handlers: HashMap::new(),
-			root_handler: RootHandler::new()
-		}
-	}
-	
-	
-	fn start<A>(self, addr: A) -> Server
-	where A: ToSocketAddrs{
-		let server = hyper::Server::http(addr).unwrap();
-		let listening = server.handle(move |req: hyper::server::request::Request, mut res: hyper::server::response::Response<Fresh>|{
-			{
-				let mut request = Request;
-				let mut response = Response{
-					hyper: res
-				};
-				self.handle(request, response);
-			}
-			//println!("HANDLE STUFF");
-			//*res.status_mut() = StatusCode::Ok;
-			//let mut res2 = res.start().unwrap();
-			//write!(res2, "test");
-			//res2.end().unwrap();
-			//res.send(b"Hello World!");
-		}).unwrap();
-		Server{
-			listening: listening
-		}
-	}
-}
