@@ -12,13 +12,14 @@ use hyper::server::request::Request as HyperRequest;
 use hyper::server::response::Response as HyperResponse;
 
 
-pub struct Request<'a, 'b: 'a, 'c>{
+pub struct Request<'a, 'b: 'a, 'c, 'd>{
 	path: String,
 	req: hyper::server::request::Request<'a, 'b>,
-	res: hyper::server::response::Response<'c, hyper::net::Fresh>
+	res: hyper::server::response::Response<'c, hyper::net::Fresh>,
+	cookie_key: &'d [u8]
 }
 
-impl<'a, 'b, 'c> Request<'a, 'b, 'c>{
+impl<'a, 'b, 'c, 'd> Request<'a, 'b, 'c, 'd>{
 	pub fn get_path(&self) -> &str{
 		&self.path
 	}
@@ -56,6 +57,10 @@ impl<'a, 'b, 'c> Request<'a, 'b, 'c>{
 		Ok(Action::Done( (status, Box::new(body)) ))
 	}
 	
+	pub fn get_request_header<H>(&self) -> Option<&H>
+	where H: Header + HeaderFormat{
+		self.req.headers.get()
+	}
 	pub fn set_response_header<H>(&mut self, header: H)
 	where H: Header + HeaderFormat{
 		self.res.headers_mut().set(header);
@@ -70,7 +75,7 @@ impl<'a, 'b, 'c> Request<'a, 'b, 'c>{
 	}
 }
 
-pub fn new<'a, 'b, 'c>(req: hyper::server::request::Request<'a, 'b>, res: hyper::server::response::Response<'c, hyper::net::Fresh>) -> Request<'a, 'b, 'c>{
+pub fn new<'a, 'b, 'c, 'd>(req: hyper::server::request::Request<'a, 'b>, res: hyper::server::response::Response<'c, hyper::net::Fresh>, cookie_key: &'d [u8]) -> Request<'a, 'b, 'c, 'd>{
 	let path:String = match req.uri{
 		hyper::uri::RequestUri::AbsolutePath(ref path) => path,
 		_ => panic!("not implemented: wrong RequestUri")
@@ -79,10 +84,11 @@ pub fn new<'a, 'b, 'c>(req: hyper::server::request::Request<'a, 'b>, res: hyper:
 	Request{
 		path: path,
 		req: req,
-		res: res
+		res: res,
+		cookie_key: cookie_key
 	}	
 }
 
-pub fn deconstruct<'a, 'b: 'a, 'c>(req: Request<'a, 'b, 'c>) -> (HyperRequest<'a, 'b>, HyperResponse<'c, hyper::net::Fresh>){
+pub fn deconstruct<'a, 'b: 'a, 'c, 'd>(req: Request<'a, 'b, 'c, 'd>) -> (HyperRequest<'a, 'b>, HyperResponse<'c, hyper::net::Fresh>){
 	(req.req, req.res)
 }

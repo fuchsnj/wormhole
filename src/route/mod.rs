@@ -1,3 +1,4 @@
+#![feature(default_type_parameter_fallback)]
 /*
 mod route;
 mod sub_route;
@@ -21,7 +22,7 @@ pub use self::start_server::StartServer;
 */
 use handler::{HandlerResult, Handler, ErrorHandler, ParamHandler, PathHandler, Action};
 use request::Request;
-use std::net::ToSocketAddrs;
+
 use server::Server;
 use hyper;
 use status_code::StatusCode;
@@ -31,49 +32,22 @@ use body::Body;
 use std::marker::PhantomData;
 use std::sync::Arc;
 use method::Method;
+use header;
+use unicase::UniCase;
+
 
 pub struct Route<D1, D2, E>{
 	handler: Arc<Handler<D1, D2, E> + Send + Sync + 'static>
 }
 
 
-impl<D2: 'static, E: 'static> Route<(), D2, E>{
-	pub fn start<A>(self, addr: A) -> Server
-	where A: ToSocketAddrs{
-		let server = hyper::Server::http(addr).unwrap();
-		let listening = server.handle(move |req: hyper::server::request::Request, mut res: hyper::server::response::Response<hyper::net::Fresh>|{
-			*res.status_mut() = StatusCode::InternalServerError;//error returned if thread panics
-			let mut request = request::new(req, res);
-			let (status_code, body) = match self.handler.handle(&mut request, () ){
-			
-				//TODO: should D2 be generic, or always '()'?
-				Ok(Action::Next(_)) => (StatusCode::NotFound, Box::new("404 - Not Found") as Box<Body>),
-				Ok(Action::Done(data)) => data,
-				Err(err) => (StatusCode::InternalServerError, Box::new("500 - Internal Server Error") as Box<Body>)
-			};
-			//let body2: Box<Body> = body;
-			let (req, mut res) = request::deconstruct(request);
-			*res.status_mut() = status_code;
-			match res.start(){
-				Ok(mut stream) => {
-					body.write_to(&mut stream);
-				},
-				Err(_) => {
-					println!("failed to obtain HTTP output stream!");
-				}
-			};
-		}).unwrap();
-		server::new(listening)
-	}
-}
-
-pub fn route<E>() -> Route<(), (), E>{
+pub fn route<D1,E>() -> Route<D1, D1, E>{
 	Route{
 		handler: Arc::new(())
 	}
 }
 
-impl<D1: 'static, D2: 'static, E: 'static> Route<D1, D2, E>{
+impl<D1: 'static, D2: Clone + 'static, E: 'static> Route<D1, D2, E>{
 	pub fn using<H2: 'static, D3>(self, handler: H2) -> Route<D1, D3, E>
 	where H2: Send + Sync + Handler<D2, D3, E>{
 		Route{
@@ -93,11 +67,43 @@ impl<D1: 'static, D2: 'static, E: 'static> Route<D1, D2, E>{
 		}
 	}
 	
-	pub fn param<H2>(self, handler: H2) -> Route<D1, D2, E>
-	where H2: Send + Sync + ParamHandler<D2, E> + 'static{
-		self.path(move |req: &mut Request, data, path: Option<&str>|{
+	pub fn param<H2, H3, D3, D4>(self, param_handler: H2, handler: H3) -> Route<D1, D2, E> where
+	H2: Send + Sync + ParamHandler<D2, D3, E> + 'static,
+	H3: Send + Sync + Handler<D3, D4, E> + 'static{
+		self.path(move |req: &mut Request, data: D2, path: Option<&str>|{
 			match path{
-				Some(param) => handler.handle_param(req, data, param),
+				Some(param) => {
+					let data3: D3 = match param_handler.handle_param(req, data.clone(), param){
+						Ok(Action::Next(data)) => data,
+						Ok(Action::Done(res)) => return Ok(Action::Done(res)),
+						Err(err) => return Err(err)
+					};
+					match handler.handle(req, data3){
+						Ok(Action::Next(_)) => Ok(Action::Next(data)),
+						Ok(Action::Done(res)) => Ok(Action::Done(res)),
+						Err(err) => Err(err)
+					}
+				},
+				None => req.next(data)
+			}
+		})
+	}
+	
+	pub fn route<H2, D3>(self, path: &str, handler: H2) -> Route<D1, D2, E>
+	where H2: Send + Sync + Handler<D2, D3, E> + 'static{
+		let path = path.to_owned();
+		self.path(move |req: &mut Request, data: D2, p: Option<&str>|{
+			match p{
+				Some(param) => {
+					match param == path{
+						true => match handler.handle(req, data.clone()){
+							Ok(Action::Next(_)) => Ok(Action::Next(data)),
+							Ok(Action::Done(res)) => Ok(Action::Done(res)),
+							Err(err) => Err(err)
+						},
+						false => req.next(data)
+					}
+				},
 				None => req.next(data)
 			}
 		})
@@ -181,7 +187,28 @@ impl<D1: 'static, D2: 'static, E: 'static> Route<D1, D2, E>{
 	where H2: Handler<D2, D2, E> + 'static{
 		self.method(Method::Options, handler)
 	}
-
+	pub fn cors(self) -> Route<D1, D2, E>{
+		self.using(|req: &mut Request, data: D2| -> HandlerResult<D2, E>{
+			if req.get_method() == &Method::Options {
+				req.set_response_header(header::AccessControlAllowOrigin::Any);
+				if let Some(requested_headers) = req.get_request_header::<header::AccessControlRequestHeaders>()
+				.map(|h|h.0.clone()){
+					req.set_response_header(header::AccessControlAllowHeaders(requested_headers));
+				}
+				//if let Some(ref headers) = req.get_request_header::<header::AccessControlRequestHeaders>(){
+				//	req.set_response_header(header::AccessControlAllowHeaders(headers.0.clone()));
+				//} 
+				//req.get_request_header(
+				//req.set_response_header(header::AccessControlAllowHeaders(vec!(
+				//	UniCase("Content-Type".to_owned())
+				//)));
+				req.send(StatusCode::Ok, "")
+			}else{
+				req.set_response_header(header::AccessControlAllowOrigin::Any);
+				req.next(data)
+			}
+		})
+	}
 }
 
 fn get_next_url_segment(mut path: &str) -> (Option<&str>, &str){

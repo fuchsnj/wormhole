@@ -1,3 +1,5 @@
+#![feature(default_type_parameter_fallback)]
+
 extern crate hyper;
 extern crate url;
 extern crate rustc_serialize;
