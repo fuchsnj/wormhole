@@ -19,20 +19,20 @@ impl Write for NullWriter{
 	fn flush(&mut self) -> io::Result<()>{Ok(())}
 }
 
-struct HyperHandler<H, D2, E>{
+struct HyperHandler<H, E>{
 	handler: H,
-	phantom: PhantomData<fn(D2) -> E>,
+	phantom: PhantomData<fn() -> E>,
 	cookie_key: Vec<u8>
 }
-impl<H, D2, E> hyper::server::Handler for HyperHandler<H, D2, E>
-where H: Handler<(), D2, E> + 'static{
+impl<H, E> hyper::server::Handler for HyperHandler<H, E>
+where H: Handler<(), E> + 'static{
 	fn handle<'a, 'k>(&'a self, req: HyperRequest<'a, 'k>, mut res: HyperResponse<'a, HyperFresh>){
 		*res.status_mut() = StatusCode::InternalServerError;//error returned if thread panics
 		let mut request = request::new(req, res, &self.cookie_key);
-		let (status_code, body) = match self.handler.handle(&mut request, () ){
+		let (status_code, body) = match self.handler.handle(&mut request, &() ){
 		
 			//TODO: should D2 be generic, or always '()'?
-			Ok(Action::Next(_)) => (StatusCode::NotFound, Box::new("404 - Not Found") as Box<Body>),
+			Ok(Action::Next) => (StatusCode::NotFound, Box::new("404 - Not Found") as Box<Body>),
 			Ok(Action::Done(data)) => data,
 			Err(err) => (StatusCode::InternalServerError, Box::new("500 - Internal Server Error") as Box<Body>)
 		};
@@ -53,9 +53,9 @@ where H: Handler<(), D2, E> + 'static{
 	}
 }
 
-impl<H, D2, E> HyperHandler<H, D2, E>
-where H: Handler<(), D2, E> + 'static{
-	fn new(handler: H, cookie_key: &[u8]) -> HyperHandler<H, D2, E>{
+impl<H, E> HyperHandler<H, E>
+where H: Handler<(), E> + 'static{
+	fn new(handler: H, cookie_key: &[u8]) -> HyperHandler<H, E>{
 		HyperHandler{
 			handler: handler,
 			phantom: PhantomData,
@@ -81,11 +81,10 @@ impl Server{
 		self.cookie_key = Vec::from(key);
 	}
 	
-	pub fn start<A, H, D2, E>(&mut self, addr: A, handler: H) where
+	pub fn start<A, H, E>(&mut self, addr: A, handler: H) where
 	A: ToSocketAddrs,
-	H: Handler<(), D2, E> + 'static,
-	E: 'static,
-	D2: 'static{
+	H: Handler<(), E> + 'static,
+	E: 'static{
 		let server = hyper::Server::http(addr).unwrap();
 		let cookie_key = self.cookie_key.clone();
 		let handler = HyperHandler::new(handler, &self.cookie_key);

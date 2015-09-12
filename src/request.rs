@@ -52,7 +52,7 @@ impl<'a, 'b, 'c, 'd> Request<'a, 'b, 'c, 'd>{
 	//	}
 	//}
 	
-	pub fn send<E, D2, T>(&mut self, status: StatusCode, body: T) -> HandlerResult<D2, E>
+	pub fn send<E, T>(&mut self, status: StatusCode, body: T) -> HandlerResult<E>
 	where T: Body + 'static{
 		Ok(Action::Done( (status, Box::new(body)) ))
 	}
@@ -66,11 +66,11 @@ impl<'a, 'b, 'c, 'd> Request<'a, 'b, 'c, 'd>{
 		self.res.headers_mut().set(header);
 	}
 	
-	pub fn next<D, E>(&self, data: D) -> HandlerResult<D, E>{
-		Ok(Action::Next(data))
+	pub fn next<E>(&self) -> HandlerResult<E>{
+		Ok(Action::Next)
 	}
 	
-	pub fn error<D, E>(&self, err: E) -> HandlerResult<D, E>{
+	pub fn error<E>(&self, err: E) -> HandlerResult<E>{
 		Err(err)
 	}
 }

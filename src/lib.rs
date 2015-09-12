@@ -1,5 +1,3 @@
-#![feature(default_type_parameter_fallback)]
-
 extern crate hyper;
 extern crate url;
 extern crate rustc_serialize;
@@ -20,11 +18,7 @@ mod method{
 pub mod header{
 	pub use hyper::header::*;
 }
-
 pub use route::Route;
-//pub use route::SubRoute;
-//pub use route::AfterRoute;
-
 pub use request::Request;
 pub use status_code::StatusCode;
 pub use method::Method;
@@ -35,9 +29,7 @@ pub mod prelude{
 	pub use {Request, StatusCode};
 	pub use Route;
 	pub use server::Server;
-	//pub use {Route, SubRoute, AfterRoute};
 	pub use header;
 	pub use handler::{Action, HandlerResult};
-	//pub use route::{BeforeMiddlewareMethods, RootMiddlewareMethods, SubMiddlewareMethods, AfterMiddlewareMethods, StartServer};
 }
 

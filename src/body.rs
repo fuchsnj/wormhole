@@ -28,3 +28,10 @@ impl<'a> Body for PrettyJson<'a>{
 		dest.write_all(format!("{}", self).as_bytes())
 	}
 }
+
+impl<'a, T> Body for &'a T
+where T : Body{
+	fn write_to(&self, dest: &mut Write) -> Result<(), io::Error>{
+		self.write_to(dest)
+	}
+}
