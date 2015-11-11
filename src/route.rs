@@ -12,6 +12,7 @@ use std::sync::Arc;
 use method::Method;
 use header;
 use unicase::UniCase;
+use std::fmt;
 
 pub struct Route<D, E>{
 	handler: Arc<Handler<D, E> + Send + Sync + 'static>
@@ -195,25 +196,60 @@ impl<D: 'static, E: 'static> Route<D, E>{
 	}
 	pub fn cors(self) -> Route<D, E>{
 		self.using(|req: &mut Request, data: &D| -> HandlerResult<E>{
+			if let Some(origin) = req.get_request_header::<OriginHeader>()
+			.map(|h|h.clone()){
+				req.set_response_header(header::AccessControlAllowOrigin::Value(origin.0.clone()));
+			}
+			if let Some(requested_headers) = req.get_request_header::<header::AccessControlRequestHeaders>()
+			.map(|h|h.0.clone()){
+				req.set_response_header(header::AccessControlAllowHeaders(requested_headers));
+			}
+			req.set_response_header(AccessControlAllowCredentialsHeader);
+			
 			if req.get_method() == &Method::Options {
-				req.set_response_header(header::AccessControlAllowOrigin::Any);
-				if let Some(requested_headers) = req.get_request_header::<header::AccessControlRequestHeaders>()
-				.map(|h|h.0.clone()){
-					req.set_response_header(header::AccessControlAllowHeaders(requested_headers));
-				}
-				//if let Some(ref headers) = req.get_request_header::<header::AccessControlRequestHeaders>(){
-				//	req.set_response_header(header::AccessControlAllowHeaders(headers.0.clone()));
-				//} 
-				//req.get_request_header(
-				//req.set_response_header(header::AccessControlAllowHeaders(vec!(
-				//	UniCase("Content-Type".to_owned())
-				//)));
 				req.send(StatusCode::Ok, "")
 			}else{
-				req.set_response_header(header::AccessControlAllowOrigin::Any);
 				req.next()
 			}
 		})
+	}
+}
+
+// Temporary implementation of Origin header until Hyper has an official one
+// https://github.com/hyperium/hyper/issues/651
+#[derive(Clone, Debug)]
+struct OriginHeader(String);
+impl hyper::header::Header for OriginHeader{
+	fn header_name() -> &'static str{
+		"Origin"
+	}
+	fn parse_header(raw: &[Vec<u8>]) -> Result<Self, hyper::error::Error>{
+		Ok(OriginHeader(
+			try!(String::from_utf8(raw[0].clone()))
+		))
+	}
+}
+impl hyper::header::HeaderFormat for OriginHeader{
+	 fn fmt_header(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error>{
+	 	Ok(())
+	 }
+}
+
+// Temporary implementation of AccessControlAllowCredentials header until Hyper has an official one
+// https://github.com/hyperium/hyper/issues/655
+#[derive(Clone, Debug)]
+struct AccessControlAllowCredentialsHeader;
+impl hyper::header::Header for AccessControlAllowCredentialsHeader{
+	fn header_name() -> &'static str{
+		"Access-Control-Allow-Credentials"
+	}
+	fn parse_header(_: &[Vec<u8>]) -> Result<Self, hyper::error::Error>{
+		Ok(AccessControlAllowCredentialsHeader)
+	}
+}
+impl hyper::header::HeaderFormat for AccessControlAllowCredentialsHeader{
+	fn fmt_header(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error>{
+		f.write_str("true")
 	}
 }
 

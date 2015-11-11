@@ -10,6 +10,11 @@ use std::marker::PhantomData;
 use hyper::server::request::Request as HyperRequest;
 use hyper::server::response::Response as HyperResponse;
 use hyper::net::Fresh as HyperFresh;
+use header;
+use cookie::CookieJar;
+use hyper::net::Openssl;
+use std::path::Path;
+use openssl::ssl::error::SslError;
 
 struct NullWriter;
 impl Write for NullWriter{
@@ -30,15 +35,18 @@ where H: Handler<(), E> + 'static{
 		*res.status_mut() = StatusCode::InternalServerError;//error returned if thread panics
 		let mut request = request::new(req, res, &self.cookie_key);
 		let (status_code, body) = match self.handler.handle(&mut request, &() ){
-		
-			//TODO: should D2 be generic, or always '()'?
 			Ok(Action::Next) => (StatusCode::NotFound, Box::new("404 - Not Found") as Box<Body>),
 			Ok(Action::Done(data)) => data,
 			Err(err) => (StatusCode::InternalServerError, Box::new("500 - Internal Server Error") as Box<Body>)
 		};
+		if(request.response_cookies().iter().next().is_some()){
+			let setCookie = header::SetCookie::from_cookie_jar(request.response_cookies());
+			request.set_response_header(setCookie);
+		}
 		//let body2: Box<Body> = body;
 		let (mut req, mut res) = request::deconstruct(request);
 		*res.status_mut() = status_code;
+		
 		match res.start(){
 			Ok(mut stream) => {
 				body.write_to(&mut stream);
@@ -67,14 +75,24 @@ where H: Handler<(), E> + 'static{
 
 pub struct Server{
 	running: Option<hyper::server::Listening>,
-	cookie_key: Vec<u8>
+	cookie_key: Vec<u8>,
+	ssl: Option<Openssl>
 }
 impl Server{
 	pub fn http() -> Server{
 		Server{
 			running: None,
-			cookie_key: vec!(0)
+			cookie_key: vec!(0),
+			ssl: None
 		}
+	}
+	pub fn https<C,K>(cert: C, key: K) -> Result<Server, SslError>
+	where C: AsRef<Path>, K: AsRef<Path>{
+		Ok(Server{
+			running: None,
+			cookie_key: vec!(0),
+			ssl: Some(try!(Openssl::with_cert_and_key(cert, key)))
+		})
 	}
 	
 	pub fn set_cookie_key(&mut self, key: &[u8]){
@@ -85,16 +103,20 @@ impl Server{
 	A: ToSocketAddrs,
 	H: Handler<(), E> + 'static,
 	E: 'static{
-		let server = hyper::Server::http(addr).unwrap();
-		let cookie_key = self.cookie_key.clone();
-		let handler = HyperHandler::new(handler, &self.cookie_key);
-		let listening = server.handle(handler).unwrap();
-		/*
-		let listening = server.handle(move |req: hyper::server::request::Request, mut res: hyper::server::response::Response<hyper::net::Fresh>|{
-			let ck = cookie_key;
-			
-		}).unwrap();
-		*/
+		let listening = match self.ssl{
+			Some(ref ssl) => {
+				let server = hyper::Server::https(addr, ssl.clone()).unwrap();
+				let cookie_key = self.cookie_key.clone();
+				let handler = HyperHandler::new(handler, &self.cookie_key);
+				server.handle(handler).unwrap()
+			},
+			None => {
+				let server = hyper::Server::http(addr).unwrap();
+				let cookie_key = self.cookie_key.clone();
+				let handler = HyperHandler::new(handler, &self.cookie_key);
+				server.handle(handler).unwrap()
+			}
+		};
 		self.running = Some(listening);
 	}
 	

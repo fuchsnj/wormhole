@@ -32,6 +32,6 @@ impl<'a> Body for PrettyJson<'a>{
 impl<'a, T> Body for &'a T
 where T : Body{
 	fn write_to(&self, dest: &mut Write) -> Result<(), io::Error>{
-		self.write_to(dest)
+		(*self).write_to(dest)
 	}
 }

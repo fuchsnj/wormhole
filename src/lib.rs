@@ -2,6 +2,8 @@ extern crate hyper;
 extern crate url;
 extern crate rustc_serialize;
 extern crate unicase;
+extern crate openssl;
+pub extern crate cookie;
 
 pub mod handler;
 mod route;
@@ -31,5 +33,6 @@ pub mod prelude{
 	pub use server::Server;
 	pub use header;
 	pub use handler::{Action, HandlerResult};
+	pub use cookie::Cookie;
 }
 

@@ -4,7 +4,9 @@ version = "0.1.0"
 authors = ["Nathan Fuchs <fuchsnj@gmail.com>"]
 
 [dependencies]
-hyper = "^0.6.10"
-url = "^0.2.37"
-rustc-serialize = "^0.3.16"
-unicase = "^1.0.0"
+hyper = "0.6.10"
+url = "0.2.37"
+rustc-serialize = "0.3.16"
+unicase = "1.0.0"
+cookie = "0.1.21"
+openssl = "0.6.5"
