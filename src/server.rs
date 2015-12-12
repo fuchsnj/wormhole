@@ -39,7 +39,7 @@ where H: Handler<(), E> + 'static{
 			Ok(Action::Done(data)) => data,
 			Err(err) => (StatusCode::InternalServerError, Box::new("500 - Internal Server Error") as Box<Body>)
 		};
-		if(request.response_cookies().iter().next().is_some()){
+		if request.response_cookies().iter().next().is_some(){
 			let setCookie = header::SetCookie::from_cookie_jar(request.response_cookies());
 			request.set_response_header(setCookie);
 		}

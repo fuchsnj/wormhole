@@ -9,6 +9,7 @@ use handler::{HandlerResult, Action};
 use header::{Header, HeaderFormat};
 use header;
 use cookie::CookieJar;
+use std::io;
 
 use hyper::server::request::Request as HyperRequest;
 use hyper::server::response::Response as HyperResponse;
@@ -37,17 +38,15 @@ impl<'a, 'b, 'c> Request<'a, 'b, 'c>{
 	pub fn get_method(&self) -> &Method{
 		&self.req.method
 	}
-	pub fn get_body_as_string(&mut self) -> Result<String, std::io::Error>{
-		let buffer = &mut String::new();
-		try!(self.req.read_to_string(buffer));
-		buffer
+	pub fn get_body_as_string(&mut self) -> Result<String, io::Error>{
+		let mut buffer = String::new();
+		try!(self.req.read_to_string(&mut buffer));
+		Ok(buffer)
 	}
 	
 	pub fn get_json<T>(&mut self) -> Result<T, json::DecoderError>
 	where T: Decodable{
 		let buffer = &mut String::new();
-		
-		
 		match self.req.read_to_string(buffer){
 			Ok(_) => json::decode(buffer),
 			Err(err) => Err(json::DecoderError::ParseError(json::ParserError::IoError(err))) 
