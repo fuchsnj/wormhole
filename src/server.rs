@@ -30,11 +30,11 @@ struct HyperHandler<H, E>{
 	cookie_key: Vec<u8>
 }
 impl<H, E> hyper::server::Handler for HyperHandler<H, E>
-where H: Handler<(), E> + 'static{
+where H: Handler<E> + 'static{
 	fn handle<'a, 'k>(&'a self, req: HyperRequest<'a, 'k>, mut res: HyperResponse<'a, HyperFresh>){
 		*res.status_mut() = StatusCode::InternalServerError;//error returned if thread panics
 		let mut request = request::new(req, res, &self.cookie_key);
-		let (status_code, body) = match self.handler.handle(&mut request, &() ){
+		let (status_code, body) = match self.handler.handle(&mut request){
 			Ok(Action::Next) => (StatusCode::NotFound, Box::new("404 - Not Found") as Box<Body>),
 			Ok(Action::Done(data)) => data,
 			Err(err) => (StatusCode::InternalServerError, Box::new("500 - Internal Server Error") as Box<Body>)
@@ -62,7 +62,7 @@ where H: Handler<(), E> + 'static{
 }
 
 impl<H, E> HyperHandler<H, E>
-where H: Handler<(), E> + 'static{
+where H: Handler<E> + 'static{
 	fn new(handler: H, cookie_key: &[u8]) -> HyperHandler<H, E>{
 		HyperHandler{
 			handler: handler,
@@ -101,7 +101,7 @@ impl Server{
 	
 	pub fn start<A, H, E>(&mut self, addr: A, handler: H) where
 	A: ToSocketAddrs,
-	H: Handler<(), E> + 'static,
+	H: Handler<E> + 'static,
 	E: 'static{
 		let listening = match self.ssl{
 			Some(ref ssl) => {

@@ -1,4 +1,4 @@
-use handler::{HandlerResult, Handler, ErrorHandler, ParamHandler, PathHandler, Action, DataHandler};
+use handler::{HandlerResult, Handler, ErrorHandler, PathHandler, Action};
 use request::Request;
 
 use server::Server;
@@ -14,30 +14,31 @@ use header;
 use unicase::UniCase;
 use std::fmt;
 
-pub struct Route<D, E>{
-	handler: Arc<Handler<D, E> + Send + Sync + 'static>
+pub struct Route<E>{
+	handler: Arc<Handler<E> + Send + Sync + 'static>
 }
 
-pub fn route<D, E>() -> Route<D, E>{
+pub fn route<E>() -> Route<E>{
 	Route{
 		handler: Arc::new(())
 	}
 }
 
-impl<D: 'static, E: 'static> Route<D, E>{
-	pub fn using<H2: 'static>(self, handler: H2) -> Route<D, E>
-	where H2: Send + Sync + Handler<D, E>{
+impl<E: 'static> Route<E>{
+	pub fn using<H2: 'static>(self, handler: H2) -> Route<E>
+	where H2: Send + Sync + Handler<E>{
 		Route{
-			handler: Arc::new(move |req: &mut Request, data: &D|{
-				match self.handler.handle(req, data){
+			handler: Arc::new(move |req: &mut Request|{
+				match self.handler.handle(req){
 					Ok(Action::Next) => {},
 					Ok(Action::Done(res)) => return Ok(Action::Done(res)),
 					Err(err) => return Err(err)
 				};
-				handler.handle(req, data)
+				handler.handle(req)
 			})
 		}
 	}
+	/*
 	pub fn data<DH, H, D2>(self, data_handler: DH, handler: H) -> Route<D, E> where
 	DH: Send + Sync + DataHandler<D, D2, E> + 'static,
 	H: Send + Sync + Handler<D2, E> + 'static{
@@ -59,12 +60,12 @@ impl<D: 'static, E: 'static> Route<D, E>{
 				}
 			})
 		}
-	}
-	pub fn catch<H2: 'static>(self, handler: H2) -> Route<D, E>
+	}*/
+	pub fn catch<H2: 'static>(self, handler: H2) -> Route<E>
 	where H2: Send + Sync + ErrorHandler<E>{
 		Route{
-			handler: Arc::new(move |req: &mut Request, data: &D|{
-				let err:E = match self.handler.handle(req, data){
+			handler: Arc::new(move |req: &mut Request|{
+				let err:E = match self.handler.handle(req){
 					Ok(Action::Next) => return Ok(Action::Next),
 					Ok(Action::Done(res)) => return Ok(Action::Done(res)),
 					Err(err) => err
@@ -73,6 +74,7 @@ impl<D: 'static, E: 'static> Route<D, E>{
 			})
 		}
 	}
+	/*
 	pub fn param<H2, H3, D2>(self, param_handler: H2, handler: H3) -> Route<D, E> where
 	H2: Send + Sync + ParamHandler<D, D2, E> + 'static,
 	H3: Send + Sync + Handler<D2, E> + 'static{
@@ -92,16 +94,16 @@ impl<D: 'static, E: 'static> Route<D, E>{
 				None => req.next()
 			}
 		})
-	}
+	}*/
 	
-	pub fn route<H2>(self, path: &str, handler: H2) -> Route<D, E>
-	where H2: Send + Sync + Handler<D, E> + 'static{
+	pub fn route<H2>(self, path: &str, handler: H2) -> Route<E>
+	where H2: Send + Sync + Handler<E> + 'static{
 		let path = path.to_owned();
-		self.path(move |req: &mut Request, data: &D, p: Option<&str>|{
+		self.path(move |req: &mut Request, p: Option<&str>|{
 			match p{
 				Some(param) => {
 					match param == path{
-						true => handler.handle(req, data),
+						true => handler.handle(req),
 						false => req.next()
 					}
 				},
@@ -110,21 +112,21 @@ impl<D: 'static, E: 'static> Route<D, E>{
 		})
 	}
 	
-	pub fn root<H2>(self, handler: H2) -> Route<D, E>
-	where H2: Send + Sync + Handler<D, E> + 'static{
-		self.path(move |req: &mut Request, data: &D, path: Option<&str>|{
+	pub fn root<H2>(self, handler: H2) -> Route<E>
+	where H2: Send + Sync + Handler<E> + 'static{
+		self.path(move |req: &mut Request, path: Option<&str>|{
 			match path{
 				Some(_) => req.next(),
-				None => handler.handle(req, data)
+				None => handler.handle(req)
 			}
 		})
 	}
 	
-	pub fn path<H2>(self, handler: H2) -> Route<D, E>
-	where H2: Send + Sync + PathHandler<D, E> + 'static{
+	pub fn path<H2>(self, handler: H2) -> Route<E>
+	where H2: Send + Sync + PathHandler<E> + 'static{
 		Route{
-			handler: Arc::new(move |req: &mut Request, data: &D|{
-				match self.handler.handle(req, data){
+			handler: Arc::new(move |req: &mut Request|{
+				match self.handler.handle(req){
 					Ok(Action::Next) => {},
 					Ok(Action::Done(res)) => return Ok(Action::Done(res)),
 					Err(err) => return Err(err)
@@ -134,7 +136,7 @@ impl<D: 'static, E: 'static> Route<D, E>{
 				match segment{
 					Some(segment) => {
 						req.set_path(path_remainder);
-						let result = handler.handle_path(req, data, Some(segment));
+						let result = handler.handle_path(req, Some(segment));
 						req.set_path(&path);
 						match result{
 							Ok(Action::Next) => Ok(Action::Next),
@@ -142,60 +144,60 @@ impl<D: 'static, E: 'static> Route<D, E>{
 							Err(err) => Err(err)
 						}
 					},
-					None => handler.handle_path(req, data, None)
+					None => handler.handle_path(req, None)
 				}
 			})
 		}
 	}
 	
-	pub fn method<H2>(self, method: Method, handler: H2) -> Route<D, E>
-	where H2: Send + Sync + Handler<D, E> + 'static{
-		self.root(move |req: &mut Request, data: &D|{
+	pub fn method<H2>(self, method: Method, handler: H2) -> Route<E>
+	where H2: Send + Sync + Handler<E> + 'static{
+		self.root(move |req: &mut Request|{
 			match req.get_method() == &method{
-				true => handler.handle(req, data),
+				true => handler.handle(req),
 				false => req.next()
 			}
 		})
 	}
 	
-	pub fn get<H2>(self, handler: H2) -> Route<D, E>
-	where H2: Handler<D, E> + 'static{
+	pub fn get<H2>(self, handler: H2) -> Route<E>
+	where H2: Handler<E> + 'static{
 		self.method(Method::Get, handler)
 	}
-	pub fn post<H2>(self, handler: H2) -> Route<D, E>
-	where H2: Handler<D, E> + 'static{
+	pub fn post<H2>(self, handler: H2) -> Route<E>
+	where H2: Handler<E> + 'static{
 		self.method(Method::Post, handler)
 	}
-	pub fn put<H2>(self, handler: H2) -> Route<D, E>
-	where H2: Handler<D, E> + 'static{
+	pub fn put<H2>(self, handler: H2) -> Route<E>
+	where H2: Handler<E> + 'static{
 		self.method(Method::Put, handler)
 	}
-	pub fn delete<H2>(self, handler: H2) -> Route<D, E>
-	where H2: Handler<D, E> + 'static{
+	pub fn delete<H2>(self, handler: H2) -> Route<E>
+	where H2: Handler<E> + 'static{
 		self.method(Method::Delete, handler)
 	}
-	pub fn head<H2>(self, handler: H2) -> Route<D, E>
-	where H2: Handler<D, E> + 'static{
+	pub fn head<H2>(self, handler: H2) -> Route<E>
+	where H2: Handler<E> + 'static{
 		self.method(Method::Head, handler)
 	}
-	pub fn trace<H2>(self, handler: H2) -> Route<D, E>
-	where H2: Handler<D, E> + 'static{
+	pub fn trace<H2>(self, handler: H2) -> Route<E>
+	where H2: Handler<E> + 'static{
 		self.method(Method::Trace, handler)
 	}
-	pub fn connect<H2>(self, handler: H2) -> Route<D, E>
-	where H2: Handler<D, E> + 'static{
+	pub fn connect<H2>(self, handler: H2) -> Route<E>
+	where H2: Handler<E> + 'static{
 		self.method(Method::Connect, handler)
 	}
-	pub fn patch<H2>(self, handler: H2) -> Route<D, E>
-	where H2: Handler<D, E> + 'static{
+	pub fn patch<H2>(self, handler: H2) -> Route<E>
+	where H2: Handler<E> + 'static{
 		self.method(Method::Patch, handler)
 	}
-	pub fn options<H2>(self, handler: H2) -> Route<D, E>
-	where H2: Handler<D, E> + 'static{
+	pub fn options<H2>(self, handler: H2) -> Route<E>
+	where H2: Handler<E> + 'static{
 		self.method(Method::Options, handler)
 	}
-	pub fn cors(self) -> Route<D, E>{
-		self.using(|req: &mut Request, data: &D| -> HandlerResult<E>{
+	pub fn cors(self) -> Route<E>{
+		self.using(|req: &mut Request| -> HandlerResult<E>{
 			if let Some(origin) = req.get_request_header::<OriginHeader>()
 			.map(|h|h.clone()){
 				req.set_response_header(header::AccessControlAllowOrigin::Value(origin.0.clone()));
@@ -276,8 +278,8 @@ fn get_next_url_segment(mut path: &str) -> (Option<&str>, &str){
 	}
 }
 
-impl<D, E> Handler<D, E> for Route<D, E>{
-	fn handle(&self, req: &mut Request, data: &D) -> HandlerResult<E>{
-		self.handler.handle(req, data)
+impl<E> Handler<E> for Route<E>{
+	fn handle(&self, req: &mut Request) -> HandlerResult<E>{
+		self.handler.handle(req)
 	}
 }
