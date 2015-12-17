@@ -15,14 +15,15 @@ use hyper::server::request::Request as HyperRequest;
 use hyper::server::response::Response as HyperResponse;
 
 
-pub struct Request<'a, 'b: 'a, 'c>{
+pub struct Request<'a, 'b: 'a, 'c, P>{
 	path: String,
 	req: hyper::server::request::Request<'a, 'b>,
 	res: hyper::server::response::Response<'c, hyper::net::Fresh>,
-	cookie_jar: CookieJar<'static>
+	cookie_jar: CookieJar<'static>,
+	url_params: P
 }
 
-impl<'a, 'b, 'c> Request<'a, 'b, 'c>{
+impl<'a, 'b, 'c, P> Request<'a, 'b, 'c, P>{
 	pub fn get_path(&self) -> &str{
 		&self.path
 	}
@@ -93,7 +94,7 @@ impl<'a, 'b, 'c> Request<'a, 'b, 'c>{
 	}
 }
 
-pub fn new<'a, 'b, 'c, 'd>(req: hyper::server::request::Request<'a, 'b>, res: hyper::server::response::Response<'c, hyper::net::Fresh>, cookie_key: &'d [u8]) -> Request<'a, 'b, 'c>{
+pub fn new<'a, 'b, 'c, 'd>(req: hyper::server::request::Request<'a, 'b>, res: hyper::server::response::Response<'c, hyper::net::Fresh>, cookie_key: &'d [u8]) -> Request<'a, 'b, 'c, ()>{
 	let path:String = match req.uri{
 		hyper::uri::RequestUri::AbsolutePath(ref path) => path,
 		_ => panic!("not implemented: wrong RequestUri")
@@ -103,10 +104,11 @@ pub fn new<'a, 'b, 'c, 'd>(req: hyper::server::request::Request<'a, 'b>, res: hy
 		path: path,
 		req: req,
 		res: res,
-		cookie_jar: CookieJar::new(cookie_key)
+		cookie_jar: CookieJar::new(cookie_key),
+		url_params: ()
 	}	
 }
 
-pub fn deconstruct<'a, 'b: 'a, 'c>(req: Request<'a, 'b, 'c>) -> (HyperRequest<'a, 'b>, HyperResponse<'c, hyper::net::Fresh>){
-	(req.req, req.res)
+pub fn deconstruct<'a, 'b: 'a, 'c, P>(req: Request<'a, 'b, 'c, P>) -> (HyperRequest<'a, 'b>, HyperResponse<'c, hyper::net::Fresh>, P){
+	(req.req, req.res, req.url_params)
 }

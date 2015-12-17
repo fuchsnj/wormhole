@@ -14,17 +14,18 @@ use header;
 use unicase::UniCase;
 use std::fmt;
 
-pub struct Route<E>{
-	handler: Arc<Handler<E> + Send + Sync + 'static>
+pub struct Route<E, P>{
+	handler: Arc<Handler<E, P> + Send + Sync + 'static>
 }
 
-pub fn route<E>() -> Route<E>{
+pub fn route<E, P>() -> Route<E, P>{
 	Route{
 		handler: Arc::new(())
 	}
 }
 
-impl<E: 'static> Route<E>{
+impl<E: 'static, P> Route<E, P>{
+	/*
 	pub fn using<H2: 'static>(self, handler: H2) -> Route<E>
 	where H2: Send + Sync + Handler<E>{
 		Route{
@@ -37,7 +38,7 @@ impl<E: 'static> Route<E>{
 				handler.handle(req)
 			})
 		}
-	}
+	}*/
 	/*
 	pub fn data<DH, H, D2>(self, data_handler: DH, handler: H) -> Route<D, E> where
 	DH: Send + Sync + DataHandler<D, D2, E> + 'static,
@@ -61,6 +62,7 @@ impl<E: 'static> Route<E>{
 			})
 		}
 	}*/
+	/*
 	pub fn catch<H2: 'static>(self, handler: H2) -> Route<E>
 	where H2: Send + Sync + ErrorHandler<E>{
 		Route{
@@ -73,7 +75,7 @@ impl<E: 'static> Route<E>{
 				handler.handle_error(req, err)
 			})
 		}
-	}
+	}*/
 	/*
 	pub fn param<H2, H3, D2>(self, param_handler: H2, handler: H3) -> Route<D, E> where
 	H2: Send + Sync + ParamHandler<D, D2, E> + 'static,
@@ -95,7 +97,7 @@ impl<E: 'static> Route<E>{
 			}
 		})
 	}*/
-	
+	/*
 	pub fn route<H2>(self, path: &str, handler: H2) -> Route<E>
 	where H2: Send + Sync + Handler<E> + 'static{
 		let path = path.to_owned();
@@ -110,8 +112,8 @@ impl<E: 'static> Route<E>{
 				None => req.next()
 			}
 		})
-	}
-	
+	}*/
+	/*
 	pub fn root<H2>(self, handler: H2) -> Route<E>
 	where H2: Send + Sync + Handler<E> + 'static{
 		self.path(move |req: &mut Request, path: Option<&str>|{
@@ -120,8 +122,8 @@ impl<E: 'static> Route<E>{
 				None => handler.handle(req)
 			}
 		})
-	}
-	
+	}*/
+	/*
 	pub fn path<H2>(self, handler: H2) -> Route<E>
 	where H2: Send + Sync + PathHandler<E> + 'static{
 		Route{
@@ -148,8 +150,8 @@ impl<E: 'static> Route<E>{
 				}
 			})
 		}
-	}
-	
+	}*/
+	/*
 	pub fn method<H2>(self, method: Method, handler: H2) -> Route<E>
 	where H2: Send + Sync + Handler<E> + 'static{
 		self.root(move |req: &mut Request|{
@@ -158,8 +160,8 @@ impl<E: 'static> Route<E>{
 				false => req.next()
 			}
 		})
-	}
-	
+	}*/
+	/*
 	pub fn get<H2>(self, handler: H2) -> Route<E>
 	where H2: Handler<E> + 'static{
 		self.method(Method::Get, handler)
@@ -195,7 +197,8 @@ impl<E: 'static> Route<E>{
 	pub fn options<H2>(self, handler: H2) -> Route<E>
 	where H2: Handler<E> + 'static{
 		self.method(Method::Options, handler)
-	}
+	}*/
+	/*
 	pub fn cors(self) -> Route<E>{
 		self.using(|req: &mut Request| -> HandlerResult<E>{
 			if let Some(origin) = req.get_request_header::<OriginHeader>()
@@ -214,7 +217,7 @@ impl<E: 'static> Route<E>{
 				req.next()
 			}
 		})
-	}
+	}*/
 }
 
 // Temporary implementation of Origin header until Hyper has an official one
@@ -278,8 +281,8 @@ fn get_next_url_segment(mut path: &str) -> (Option<&str>, &str){
 	}
 }
 
-impl<E> Handler<E> for Route<E>{
-	fn handle(&self, req: &mut Request) -> HandlerResult<E>{
+impl<E, P> Handler<E, P> for Route<E, P>{
+	fn handle(&self, req: &mut Request<P>) -> HandlerResult<E>{
 		self.handler.handle(req)
 	}
 }
