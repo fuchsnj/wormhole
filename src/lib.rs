@@ -3,7 +3,7 @@ extern crate url;
 extern crate rustc_serialize;
 extern crate unicase;
 extern crate openssl;
-pub extern crate cookie;
+extern crate cookie;
 
 pub mod handler;
 mod route;
