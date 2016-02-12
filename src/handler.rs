@@ -2,11 +2,6 @@ use request::Request;
 use body::Body;
 use status_code::StatusCode;
 
-use server;
-use server::Server;
-use hyper;
-use request;
-
 pub type HandlerResult<E> = Result<Action, E>;
 
 pub enum Action{
@@ -37,7 +32,7 @@ pub trait DataHandler<D1, D2, E>: Send + Sync{
 }*/
 
 impl<D, E> Handler<D, E> for (){
-	fn handle<'a, 'b, 'c>(&self, req: &mut Request<'a, 'b, 'c>, data: D) -> HandlerResult<E>{
+	fn handle<'a, 'b, 'c>(&self, req: &mut Request<'a, 'b, 'c>, _: D) -> HandlerResult<E>{
 		req.next()
 	}	
 } 

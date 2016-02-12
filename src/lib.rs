@@ -1,9 +1,14 @@
+#![feature(custom_derive, custom_attribute, plugin)]
+#![plugin(serde_macros)]
+#![plugin(json_macros)]
+
 extern crate hyper;
 extern crate url;
-extern crate rustc_serialize;
 extern crate unicase;
 extern crate openssl;
 extern crate cookie;
+extern crate serde;
+extern crate serde_json;
 
 pub mod handler;
 mod route;

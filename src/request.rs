@@ -1,7 +1,5 @@
 use method::Method;
 use hyper;
-use rustc_serialize::json;
-use rustc_serialize::Decodable;
 use std::io::Read;
 use body::Body;
 use status_code::StatusCode;
@@ -10,6 +8,10 @@ use header::{Header, HeaderFormat};
 use header;
 use cookie::CookieJar;
 use std::io;
+use serde_json::de;
+use serde_json;
+use serde::de::Deserialize;
+use serde_json::error::Error;
 
 use hyper::server::request::Request as HyperRequest;
 use hyper::server::response::Response as HyperResponse;
@@ -44,12 +46,12 @@ impl<'a, 'b, 'c> Request<'a, 'b, 'c>{
 		Ok(buffer)
 	}
 	
-	pub fn get_json<T>(&mut self) -> Result<T, json::DecoderError>
-	where T: Decodable{
+	pub fn get_json<T>(&mut self) -> Result<T, serde_json::error::Error>
+	where T: Deserialize{
 		let buffer = &mut String::new();
 		match self.req.read_to_string(buffer){
-			Ok(_) => json::decode(buffer),
-			Err(err) => Err(json::DecoderError::ParseError(json::ParserError::IoError(err))) 
+			Ok(_) => de::from_str(buffer),
+			Err(err) => Err(Error::IoError(err)) 
 		}
 	}
 	

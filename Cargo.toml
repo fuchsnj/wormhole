@@ -6,7 +6,14 @@ authors = ["Nathan Fuchs <fuchsnj@gmail.com>"]
 [dependencies]
 hyper = "0.7"
 url = "0.2.37"
-rustc-serialize = "0.3.16"
 unicase = "1.0.0"
 cookie = "0.2"
 openssl = "0.7"
+serde_json = "0.6.0"
+serde = "0.6.1"
+serde_macros = "0.6.11"
+
+[dependencies.json_macros]
+version = "^0.3"
+default-features = false
+features = ["with-serde"]

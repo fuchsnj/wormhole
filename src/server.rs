@@ -4,14 +4,13 @@ use status_code::StatusCode;
 use request;
 use handler::{Action, Handler};
 use body::Body;
-use std::io::{Read, Write};
+use std::io::Write;
 use std::io;
 use std::marker::PhantomData;
 use hyper::server::request::Request as HyperRequest;
 use hyper::server::response::Response as HyperResponse;
 use hyper::net::Fresh as HyperFresh;
 use header;
-use cookie::CookieJar;
 use hyper::net::Openssl;
 use std::path::Path;
 use openssl::ssl::error::SslError;
@@ -37,11 +36,11 @@ where H: Handler<(), E> + 'static{
 		let (status_code, body) = match self.handler.handle(&mut request, () ){
 			Ok(Action::Next) => (StatusCode::NotFound, Box::new("404 - Not Found") as Box<Body>),
 			Ok(Action::Done(data)) => data,
-			Err(err) => (StatusCode::InternalServerError, Box::new("500 - Internal Server Error") as Box<Body>)
+			Err(_) => (StatusCode::InternalServerError, Box::new("500 - Internal Server Error") as Box<Body>)
 		};
 		if request.response_cookies().iter().next().is_some(){
-			let setCookie = header::SetCookie::from_cookie_jar(request.response_cookies());
-			request.set_response_header(setCookie);
+			let set_cookie = header::SetCookie::from_cookie_jar(request.response_cookies());
+			request.set_response_header(set_cookie);
 		}
 		//let body2: Box<Body> = body;
 		let (mut req, mut res) = request::deconstruct(request);
@@ -49,7 +48,7 @@ where H: Handler<(), E> + 'static{
 		
 		match res.start(){
 			Ok(mut stream) => {
-				body.write_to(&mut stream);
+				body.write_to(&mut stream).unwrap();
 			},
 			Err(_) => {
 				println!("failed to obtain HTTP output stream!");
@@ -106,13 +105,11 @@ impl Server{
 		let listening = match self.ssl{
 			Some(ref ssl) => {
 				let server = hyper::Server::https(addr, ssl.clone()).unwrap();
-				let cookie_key = self.cookie_key.clone();
 				let handler = HyperHandler::new(handler, &self.cookie_key);
 				server.handle(handler).unwrap()
 			},
 			None => {
 				let server = hyper::Server::http(addr).unwrap();
-				let cookie_key = self.cookie_key.clone();
 				let handler = HyperHandler::new(handler, &self.cookie_key);
 				server.handle(handler).unwrap()
 			}

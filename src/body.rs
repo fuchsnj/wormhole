@@ -1,6 +1,7 @@
 use std::io::Write;
 use std::io;
-use rustc_serialize::json::{Json, PrettyJson};
+use serde_json::value::Value as Json;
+use serde_json::ser;
 
 pub trait Body{
 	fn write_to(&self, dest: &mut Write) -> Result<(), io::Error>;
@@ -19,13 +20,7 @@ impl Body for String{
 
 impl Body for Json{
 	fn write_to(&self, dest: &mut Write) -> Result<(), io::Error>{
-		dest.write_all(format!("{}", self).as_bytes())
-	}
-}
-
-impl<'a> Body for PrettyJson<'a>{
-	fn write_to(&self, dest: &mut Write) -> Result<(), io::Error>{
-		dest.write_all(format!("{}", self).as_bytes())
+		dest.write_all(ser::to_string(self).unwrap().as_bytes())
 	}
 }
 

@@ -1,17 +1,10 @@
 use handler::{HandlerResult, Handler, ErrorHandler, PathHandler, Action};
 use request::Request;
-
-use server::Server;
 use hyper;
 use status_code::StatusCode;
-use request;
-use server;
-use body::Body;
-use std::marker::PhantomData;
 use std::sync::Arc;
 use method::Method;
 use header;
-use unicase::UniCase;
 use std::fmt;
 
 pub struct Route<D, E>{
@@ -199,7 +192,7 @@ impl<D: 'static + Clone, E: 'static> Route<D, E>{
 		self.method(Method::Options, handler)
 	}
 	pub fn cors(self) -> Route<D, E>{
-		self.using(|req: &mut Request, data: D| -> HandlerResult<E>{
+		self.using(|req: &mut Request, _: D| -> HandlerResult<E>{
 			if let Some(origin) = req.get_request_header::<OriginHeader>()
 			.map(|h|h.clone()){
 				req.set_response_header(header::AccessControlAllowOrigin::Value(origin.0.clone()));
@@ -234,7 +227,7 @@ impl hyper::header::Header for OriginHeader{
 	}
 }
 impl hyper::header::HeaderFormat for OriginHeader{
-	 fn fmt_header(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error>{
+	 fn fmt_header(&self, _: &mut fmt::Formatter) -> Result<(), fmt::Error>{
 	 	Ok(())
 	 }
 }
@@ -257,7 +250,7 @@ impl hyper::header::HeaderFormat for AccessControlAllowCredentialsHeader{
 	}
 }
 
-fn get_next_url_segment(mut path: &str) -> (Option<&str>, &str){
+fn get_next_url_segment(path: &str) -> (Option<&str>, &str){
 	let mut segment_start = 0;
 	for a in 0..path.len(){
 		match path.as_bytes()[a]{
