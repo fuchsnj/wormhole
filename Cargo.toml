@@ -4,14 +4,14 @@ version = "0.1.0"
 authors = ["Nathan Fuchs <fuchsnj@gmail.com>"]
 
 [dependencies]
-hyper = "0.7"
-url = "0.2.37"
-unicase = "1.0.0"
-cookie = "0.2"
+hyper = "0.9.10"
+url = "1.2.0"
+unicase = "1.4.0"
+cookie = "0.2.5"
 openssl = "0.7"
-serde_json = "0.6.0"
-serde = "0.6.1"
-serde_macros = "0.6.11"
+serde_json = "0.8.1"
+serde = "0.8.3"
+serde_macros = "0.8.3"
 
 [dependencies.json_macros]
 version = "^0.3"

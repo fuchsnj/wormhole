@@ -51,7 +51,7 @@ impl<'a, 'b, 'c> Request<'a, 'b, 'c>{
 		let buffer = &mut String::new();
 		match self.req.read_to_string(buffer){
 			Ok(_) => de::from_str(buffer),
-			Err(err) => Err(Error::IoError(err)) 
+			Err(err) => Err(Error::Io(err)) 
 		}
 	}
 	
